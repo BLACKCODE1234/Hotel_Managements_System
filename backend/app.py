@@ -340,11 +340,70 @@ def stafflogin():
     if not all ([email,password]) :
         return jsonify({"message":"Email and Password required"}),400
     
-    db = database_connection()
-    cursor = db.cursor(cursor_factory=RealDictCursor)
-    cursor.execute("select email,passwords from")
-           
-          
-  
+    try:
+        db = database_connection()
+        cursor = db.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("select email,passwords,username,role from loginusers where email = %s",(email,))
+        user = cursor.fetchone()
+        
+        if not user:
+            return jsonify({"message":"Account not Found"}),404
+        
+        passwords = user['passwords'].encode('utf-8')
+        
+        if not bcrypt.checkpw(password.encode('utf-8'),passwords):
+            return jsonify({"message":"Incorrect Password"}),404
+        
+        role = user.get('role','staff')
+        email = user['email']
+        
+        if role != 'staff':
+            return jsonify({"message":"Unauthorised"}),403
+        
+        access_token = generate_access_token(email,role)
+        refresh_token = generate_refresh_token(email,role)
+        secure_cookie,samesite_cookie,domain_cookie = get_cookie_settings()        
+            
+        response =  jsonify({"message":"Login Successfull",
+                                "status":"success",
+                                "access_token":access_token,
+                                "user":{
+                                    "username":user.get("usesrname"),
+                                    "email":user["email"],
+                                    "role":role,
+                                    "firstname":user.get("firstname"),
+                                    "lastname":user.get("lastname")
+                                    }
+                                })
+        
+        response.set_cookie('refresh_token',refresh_token,
+                            httponly=True,
+                            secure=secure_cookie,
+                            samesite=samesite_cookie,
+                            domain=domain_cookie,
+                            max_age=7*24*60*60,
+                            path='/'
+                            )
+        
+        response.set_cookie('access_token',access_token,
+                            httponly=True,
+                            secure=secure_cookie,
+                            samesite=samesite_cookie,
+                            domain=domain_cookie,
+                            max_age=15*60,
+                            path='/'
+                            )
+        
+        return jsonify({"message":"Login Successfull","status":"success","user":user})
+    
+    except psycopg2.Error as e:
+        return jsonify({"message":"Something Happened,Connection Error","error":str(e)}),500
+    finally:
+        if 'cursor' in locals():
+            cursor.close()
+        if 'db' in locals():
+            db.close()
+            
+            
 if __name__ == '__main__':
     app.run(debug=True)
