@@ -98,8 +98,8 @@ def signup():
             domain=domain_cookie,
             max_age=15*60
         )
-        return response,201
-    
+        
+        return response,200
     except psycopg2.Error as e:
         return jsonify({"message":"Database error","error":str(e),"status":"error","user":None}),500
     finally:
@@ -121,7 +121,7 @@ def login():
     try:
         db = database_connection()
         cursor = db.cursor(cursor_factory=RealDictCursor) 
-        cursor.execute("select passwords,role,email,username from loginusers where username = %s",(username,))           
+        cursor.execute("select passwords,role,email,username,firstname,lastname from loginusers where username = %s",(username,))           
         user = cursor.fetchone()
         
         if not user:
@@ -171,8 +171,7 @@ def login():
                             path='/'
                             )
         
-        return jsonify({"message":"Login Succesfull","status":"success","user":user}),200
-
+        return response,200
     except psycopg2.Error as e:
         return jsonify({"message":"Something Happened,Connection Error","error":str(e)}),500
     
@@ -195,7 +194,7 @@ def adminlogin():
     try:
         db = database_connection()
         cursor = db.cursor(cursor_factory=RealDictCursor)
-        cursor.execute("select passwords,email,role,username from loginusers where email = %s",(email,))
+        cursor.execute("select passwords,email,role,username,firstname,lastname from loginusers where email = %s",(email,))
         user = cursor.fetchone()
         
         if not user:
@@ -220,7 +219,7 @@ def adminlogin():
                              "status":"success",
                              "access_token":access_token,
                              "user":{
-                                 "username":user.get("usesrname"),
+                                 "username":user.get("username"),
                                  "email":user["email"],
                                  "role":role,
                                  "firstname":user.get("firstname"),
@@ -246,8 +245,7 @@ def adminlogin():
                             path='/'
                             )
         
-        return jsonify({"message":"Login Succesfull","status":"success","user":user}),200
-
+        return response,200
     except psycopg2.Error as e:
         return jsonify({"message":"Something Happened,Connection Error","error":str(e)}),500
     finally:
@@ -257,7 +255,7 @@ def adminlogin():
             db.close()
             
             
-@app.route('/Superadmin', methods=['POST'])
+@app.route('/superadmin', methods=['POST'])
 def superadmin():
     data = request.get_json()
     email = data.get('email')
@@ -269,10 +267,10 @@ def superadmin():
     try:
         db = database_connection()
         cursor = db.cursor(cursor_factory=RealDictCursor)
-        cursor.execute("select passwords,username,role,email from loginusers where email = %s",(email,))
+        cursor.execute("select passwords,username,role,email,firstname,lastname from loginusers where email = %s",(email,))
         user = cursor.fetchone()
         
-        if not superadmin:
+        if not user:
             return jsonify({"message":"Account not Found"}),404
         
         passwords = user['passwords'].encode('utf-8') if isinstance(user['passwords'],str) else user['passwords']
@@ -280,7 +278,7 @@ def superadmin():
         if not bcrypt.checkpw(password.encode('utf-8'),passwords):
             return jsonify({"message":"Incorrect Password"}),404
         
-        role = superadmin.get('role','superadmin')
+        role = user.get('role','superadmin')
         
         if role != 'superadmin':
             return jsonify({"message":"Unauthorised Access"}),403
@@ -320,8 +318,7 @@ def superadmin():
                             )
         
         
-        return jsonify({"message":"Login Successfull","status":"success","user":user}),200
-             
+        return response,200             
     except psycopg2.Error as e:
         return jsonify({"message":"Something Happened,Connection Error","error":str(e)}),500
     finally:
@@ -343,7 +340,7 @@ def stafflogin():
     try:
         db = database_connection()
         cursor = db.cursor(cursor_factory=RealDictCursor)
-        cursor.execute("select email,passwords,username,role from loginusers where email = %s",(email,))
+        cursor.execute("select email,passwords,username,role,firstname,lastname from loginusers where email = %s",(email,))
         user = cursor.fetchone()
         
         if not user:
@@ -368,7 +365,7 @@ def stafflogin():
                                 "status":"success",
                                 "access_token":access_token,
                                 "user":{
-                                    "username":user.get("usesrname"),
+                                    "username":user.get("username"),
                                     "email":user["email"],
                                     "role":role,
                                     "firstname":user.get("firstname"),
@@ -394,8 +391,7 @@ def stafflogin():
                             path='/'
                             )
         
-        return jsonify({"message":"Login Successfull","status":"success","user":user})
-    
+        return response,200    
     except psycopg2.Error as e:
         return jsonify({"message":"Something Happened,Connection Error","error":str(e)}),500
     finally:
