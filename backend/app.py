@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 import os
 from psycopg2.extras import RealDictCursor
 import jwt
-from helper.generate_token import generate_refresh_token,decode_token
+from helper.generate_token import generate_refresh_token,decode_token,generate_access_token
 import requests
 
 load_dotenv()
@@ -28,6 +28,14 @@ def database_connection():
         print(f"Database connection failed: {e}")
         raise
     
+    
+
+def get_cookie_settings():
+    is_local = ("localhost" in request.host) or ("127.0.0.1" in request.host)
+    secure_cookie = False if is_local else True
+    samesite_cookie = "Lax" if is_local else "None"  # Lax for local since same-origin now, None for production
+    domain_cookie = None  # No domain for same-origin
+    return secure_cookie, samesite_cookie, domain_cookie    
     
 @app.route('/signup',methods=['POST'])
 def signup():
@@ -65,7 +73,10 @@ def signup():
         )
         db.commit()
         
-        user = {"firstname":firstname,"lastname":lastname,"email":email}
+        access_token = generate_access_token(email,role='guest')
+        refresh_token = generate_refresh_token(email,role='guest')
+        secure_cookie,samesite_cookie,domain_cookie = get_cookie_settings()
+        guest = {"firstname":firstname,"lastname":lastname,"email":email}
         response = jsonify({"message":"Signup succesfull","status":"succes","user":user}),200 
         return response
     
