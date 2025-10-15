@@ -122,19 +122,43 @@ def login():
         db = database_connection()
         cursor = db.cursor(cursor_factory=RealDictCursor) 
         cursor.execute("select passwords,role,email,username from loginusers where username = %s",(username,))           
-        guest = cursor.fetchone()
+        user = cursor.fetchone()
         
-        if not guest:
+        if not user:
             return jsonify({"message":"User Account not found"}),404
         
-        passwords = guest['passwords'].encode('utf-8')
+        passwords = user['passwords'].encode('utf-8')
         
         if not bcrypt.checkpw(password.encode('utf-8'),passwords):
             return jsonify({"message":"Incorrect passwords"}),404
         
-        role = guest.get('role','guest')
-        return jsonify({"message":"Login Succesfull","status":"success","user":guest}),200
+        role = user.get('role','guest')
     
+        access_token = generate_access_token(email,role)
+        refresh_token = generate_refresh_token(email,role)
+        secure_cookie,samesit_cookie,domain_cookie = get_cookie_settings()
+        
+        response = jsonify({"message":"Login successful",
+                            "access_token":access_token,
+                            "user":{
+                                "email":user["email"],
+                                "role":role,
+                                "firstname":user.get("firstname"),
+                                "lastname":user.get("lastname")
+                                }
+                            })
+        response.set_cookie('refresh_token',refresh_token,
+                            httponly=True,
+                            secure=secure_cookie,
+                            samesite=samesit_cookie,
+                            domain=domain_cookie,
+                            max_age=7*24*60*60,
+                            path='/'    
+                            )
+        
+        response.set_cookie('access_token',)
+        return jsonify({"message":"Login Succesfull","status":"success","user":user}),200
+
     except psycopg2.Error as e:
         return jsonify({"message":"Something Happened,Connection Error","error":str(e)}),500
     
