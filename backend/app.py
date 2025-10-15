@@ -77,8 +77,28 @@ def signup():
         refresh_token = generate_refresh_token(email,role='guest')
         secure_cookie,samesite_cookie,domain_cookie = get_cookie_settings()
         guest = {"firstname":firstname,"lastname":lastname,"email":email}
-        response = jsonify({"message":"Signup succesfull","status":"succes","user":user}),200 
-        return response
+        response = jsonify({"message":"Signup succesfull","status":"succes","user":guest}),200 
+        
+    
+        response.set_cookie(
+            'refresh_token',
+            refresh_token,
+            httponly=True,
+            secure=secure_cookie,
+            samesite=samesite_cookie,
+            domain=domain_cookie,
+            max_age=7*24*60*60
+        )
+        response.set_cookie(
+            'access_token',
+            access_token,
+            httponly=True,
+            secure=secure_cookie,
+            samesite=samesite_cookie,
+            domain=domain_cookie,
+            max_age=15*60
+        )
+        return response,201
     
     except psycopg2.Error as e:
         return jsonify({"message":"Database error","error":str(e),"status":"error","user":None}),500
