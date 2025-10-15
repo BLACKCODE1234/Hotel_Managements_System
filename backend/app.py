@@ -402,6 +402,14 @@ def stafflogin():
         if 'db' in locals():
             db.close()
             
+
+@app.route('/logout', methods=['POST'])
+def logout():
+    response = jsonify({"message": "Logged out", "status": "success"})
+    response.set_cookie('refresh_token', '', expires=0, path='/')
+    response.set_cookie('access_token', '', expires=0, path='/')
+    return response, 200
+
             
 if __name__ == '__main__':
     app.run(debug=True)
