@@ -122,18 +122,18 @@ def login():
         db = database_connection()
         cursor = db.cursor(cursor_factory=RealDictCursor) 
         cursor.execute("select passwords,role,email,username from loginusers where username = %s",(username,))           
-        user = cursor.fetchone()
+        guest = cursor.fetchone()
         
-        if not user:
-            return jsonify({"message":"User not found"}),404
+        if not guest:
+            return jsonify({"message":"User Account not found"}),404
         
-        passwords = user['passwords'].encode('utf-8')
+        passwords = guest['passwords'].encode('utf-8')
         
         if not bcrypt.checkpw(password.encode('utf-8'),passwords):
             return jsonify({"message":"Incorrect passwords"}),404
         
-        role = user.get('role','user')
-        return jsonify({"message":"Login Succesfull","status":"success","user":user}),200
+        role = guest.get('role','guest')
+        return jsonify({"message":"Login Succesfull","status":"success","user":guest}),200
     
     except psycopg2.Error as e:
         return jsonify({"message":"Something Happened,Connection Error","error":str(e)}),500
