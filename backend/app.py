@@ -133,14 +133,20 @@ def login():
             return jsonify({"message":"Incorrect passwords"}),404
         
         role = user.get('role','guest')
-    
+        email = user['email']
+        
+        if role != 'guest':
+            return jsonify({"message":"Login unsuccessfull,only for guest"}),403
+        
         access_token = generate_access_token(email,role)
         refresh_token = generate_refresh_token(email,role)
-        secure_cookie,samesit_cookie,domain_cookie = get_cookie_settings()
+        secure_cookie,samesite_cookie,domain_cookie = get_cookie_settings()
         
         response = jsonify({"message":"Login successful",
+                            "status":"success",
                             "access_token":access_token,
                             "user":{
+                                "username":user['username'],
                                 "email":user["email"],
                                 "role":role,
                                 "firstname":user.get("firstname"),
@@ -150,13 +156,21 @@ def login():
         response.set_cookie('refresh_token',refresh_token,
                             httponly=True,
                             secure=secure_cookie,
-                            samesite=samesit_cookie,
+                            samesite=samesite_cookie,
                             domain=domain_cookie,
                             max_age=7*24*60*60,
                             path='/'    
                             )
         
-        response.set_cookie('access_token',)
+        response.set_cookie('access_token',access_token,
+                            httponly=True,
+                            secure=secure_cookie,
+                            samesite=samesite_cookie,
+                            domain=domain_cookie,
+                            max_age=15*60,
+                            path='/'
+                            )
+        
         return jsonify({"message":"Login Succesfull","status":"success","user":user}),200
 
     except psycopg2.Error as e:
@@ -182,19 +196,58 @@ def adminlogin():
         db = database_connection()
         cursor = db.cursor(cursor_factory=RealDictCursor)
         cursor.execute("select passwords,email,role,username from loginusers where email = %s",(email,))
-        admin = cursor.fetchone()
+        user = cursor.fetchone()
         
-        if not admin:
+        if not user:
             return jsonify({"message":"Account not found"}),404
         
-        passwords = admin['passwords'].encode('utf-8')
+        passwords = user['passwords'].encode('utf-8')
         
         if not bcrypt.checkpw(password.encode('utf-8'),passwords):
             return jsonify({"message":"Incorrect Password"}),404
         
-        role = admin.get('role','admin')
-        return jsonify({"message":"Login Successfull","status":"success","user":admin}),200
+        role = user.get('role','admin')
+        email = user['email']
         
+        if role != 'admin':
+            return jsonify({"message":"Login unsuccessfull,Unauthoised Account"}),403
+        
+        access_token = generate_access_token(email,role)
+        refresh_token = generate_refresh_token(email,role)
+        secure_cookie,samesite_cookie,domain_cookie = get_cookie_settings()        
+        
+        response =  jsonify({"message":"Login Successfull",
+                             "status":"success",
+                             "access_token":access_token,
+                             "user":{
+                                 "username":user.get("usesrname"),
+                                 "email":user["email"],
+                                 "role":role,
+                                 "firstname":user.get("firstname"),
+                                 "lastname":user.get("lastname")
+                                 }
+                             })
+        
+        response.set_cookie('refresh_token',refresh_token,
+                            httponly=True,
+                            secure=secure_cookie,
+                            samesite=samesite_cookie,
+                            domain=domain_cookie,
+                            max_age=7*24*60*60,
+                            path='/'
+                            )
+        
+        response.set_cookie('access_token',access_token,
+                            httponly=True,
+                            secure=secure_cookie,
+                            samesite=samesite_cookie,
+                            domain=domain_cookie,
+                            max_age=15*60,
+                            path='/'
+                            )
+        
+        return jsonify({"message":"Login Succesfull","status":"success","user":user}),200
+
     except psycopg2.Error as e:
         return jsonify({"message":"Something Happened,Connection Error","error":str(e)}),500
     finally:
