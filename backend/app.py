@@ -77,7 +77,9 @@ def signup():
         refresh_token = generate_refresh_token(email,role='guest')
         secure_cookie,samesite_cookie,domain_cookie = get_cookie_settings()
         guest = {"firstname":firstname,"lastname":lastname,"email":email}
-        response = jsonify({"message":"Signup succesfull","status":"succes","user":guest}),200 
+        response = jsonify({"message":"Signup succesfull",
+                            "status":"succes",
+                            "user":guest}) 
         
     
         response.set_cookie(
