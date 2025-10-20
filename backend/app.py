@@ -1,4 +1,5 @@
 from flask import Flask,request,jsonify
+from flask_cors import CORS
 import bcrypt
 import psycopg2
 from datetime import datetime,timedelta
@@ -12,6 +13,7 @@ import requests
 load_dotenv()
 
 app = Flask(__name__)
+CORS(app, supports_credentials=True)
 app.secret_key = os.getenv("FLASK_SECRET_KEY","THE_SECRET_KEY")
 
 
@@ -402,6 +404,105 @@ def stafflogin():
         if 'db' in locals():
             db.close()
             
+
+@app.route('/me', methods=['GET'])
+def get_current_user():
+    access_token = request.cookies.get('access_token')
+    
+    if not access_token:
+        return jsonify({"message": "No token provided", "user": None}), 401
+    
+    try:
+        payload = decode_token(access_token, is_refresh=False)
+        if not payload:
+            return jsonify({"message": "Invalid token", "user": None}), 401
+        
+        email = payload.get('email')
+        role = payload.get('role', 'guest')
+        
+        # Get user details from database
+        try:
+            db = database_connection()
+            cursor = db.cursor(cursor_factory=RealDictCursor)
+            cursor.execute("SELECT firstname, lastname, username, email, role FROM loginusers WHERE email = %s", (email,))
+            user = cursor.fetchone()
+            
+            if not user:
+                return jsonify({"message": "User not found", "user": None}), 404
+            
+            return jsonify({
+                "message": "User found",
+                "user": {
+                    "firstname": user.get('firstname'),
+                    "lastname": user.get('lastname'),
+                    "username": user.get('username'),
+                    "email": user['email'],
+                    "role": user.get('role', 'guest')
+                }
+            }), 200
+        except psycopg2.Error as db_error:
+            # Database connection failed, return basic user info from token
+            return jsonify({
+                "message": "User found (from token)",
+                "user": {
+                    "email": email,
+                    "role": role,
+                    "firstname": "User",
+                    "lastname": "",
+                    "username": email.split('@')[0]
+                }
+            }), 200
+        
+    except Exception as e:
+        return jsonify({"message": "Token validation failed", "error": str(e), "user": None}), 401
+    finally:
+        if 'cursor' in locals():
+            cursor.close()
+        if 'db' in locals():
+            db.close()
+
+
+@app.route('/refresh', methods=['POST'])
+def refresh_token():
+    refresh_token = request.cookies.get('refresh_token')
+    
+    if not refresh_token:
+        return jsonify({"message": "No refresh token provided"}), 401
+    
+    try:
+        payload = decode_token(refresh_token, is_refresh=True)
+        if not payload:
+            return jsonify({"message": "Invalid refresh token"}), 401
+        
+        email = payload.get('email')
+        role = payload.get('role', 'guest')
+        
+        # Generate new access token
+        new_access_token = generate_access_token(email, role)
+        secure_cookie, samesite_cookie, domain_cookie = get_cookie_settings()
+        
+        response = jsonify({"message": "Token refreshed", "access_token": new_access_token})
+        response.set_cookie(
+            'access_token',
+            new_access_token,
+            httponly=True,
+            secure=secure_cookie,
+            samesite=samesite_cookie,
+            domain=domain_cookie,
+            max_age=15*60,
+            path='/'
+        )
+        
+        return response, 200
+        
+    except Exception as e:
+        return jsonify({"message": "Token refresh failed", "error": str(e)}), 401
+
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({"message": "Backend is running", "status": "success"}), 200
+
 
 @app.route('/logout', methods=['POST'])
 def logout():
