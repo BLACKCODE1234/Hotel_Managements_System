@@ -1,0 +1,4 @@
+﻿* text=auto
+*.{cmd,[cC][mM][dD]} text eol=crlf
+*.{sh,bash} text eol=lf
+*.{js,jsx,ts,tsx,json,css,scss,md,html} text eol=lf
